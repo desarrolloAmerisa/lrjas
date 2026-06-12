@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lrjas-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lrjas
+      POSTGRES_PASSWORD: lrjas_secret
+      POSTGRES_DB: lrjas
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lrjas -d lrjas"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lrjas-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://lrjas:lrjas_secret@postgres:5432/lrjas?schema=public
+      JWT_SECRET: lrjas_jwt_secret_change_in_production
+      JWT_EXPIRES_IN: 7d
+      PORT: 3001
+      FRONTEND_URL: http://localhost:5173
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lrjas-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

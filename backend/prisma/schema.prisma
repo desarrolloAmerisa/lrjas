@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum FieldType {
+  CHECKBOX
+  TEXT
+  SELECT
+}
+
+enum AttendanceMethod {
+  QR
+  MANUAL
+}
+
+enum Role {
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  name      String
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Stake {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  wards        Ward[]
+  participants Participant[]
+
+  @@map("stakes")
+}
+
+model Ward {
+  id           String        @id @default(uuid())
+  name         String
+  stakeId      String        @map("stake_id")
+  stake        Stake         @relation(fields: [stakeId], references: [id])
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  participants Participant[]
+
+  @@unique([name, stakeId])
+  @@map("wards")
+}
+
+model FieldDefinition {
+  id          String                  @id @default(uuid())
+  name        String                  @unique
+  label       String
+  type        FieldType               @default(CHECKBOX)
+  required    Boolean                 @default(false)
+  active      Boolean                 @default(true)
+  createdAt   DateTime                @default(now()) @map("created_at")
+  fieldValues ParticipantFieldValue[]
+
+  @@map("field_definitions")
+}
+
+model Participant {
+  id             String                  @id @default(uuid())
+  code           String                  @unique
+  firstName      String                  @map("first_name")
+  middleName     String?                 @map("middle_name")
+  lastName       String                  @map("last_name")
+  motherLastName String                  @map("mother_last_name")
+  age            Int
+  sex            Sex
+  stakeId        String                  @map("stake_id")
+  stake          Stake                   @relation(fields: [stakeId], references: [id])
+  wardId         String                  @map("ward_id")
+  ward           Ward                    @relation(fields: [wardId], references: [id])
+  active         Boolean                 @default(true)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  fieldValues    ParticipantFieldValue[]
+  attendances    Attendance[]
+
+  @@map("participants")
+}
+
+model ParticipantFieldValue {
+  id            String          @id @default(uuid())
+  participantId String          @map("participant_id")
+  participant   Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  fieldId       String          @map("field_id")
+  field         FieldDefinition @relation(fields: [fieldId], references: [id])
+  value         Boolean         @default(false)
+
+  @@unique([participantId, fieldId])
+  @@map("participant_field_values")
+}
+
+model Attendance {
+  id            String           @id @default(uuid())
+  participantId String           @map("participant_id")
+  participant   Participant      @relation(fields: [participantId], references: [id])
+  method        AttendanceMethod
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  @@map("attendances")
+}
