@@ -6,6 +6,11 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
 COMPOSE_FILE="docker-compose.prod.yml"
+COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+if [ -f docker-compose.ssl.yml ]; then
+  COMPOSE_ARGS+=(-f docker-compose.ssl.yml)
+  echo "    (HTTPS: docker-compose.ssl.yml detectado)"
+fi
 
 if [ ! -f .env ]; then
   echo "No existe .env"
@@ -29,18 +34,18 @@ if command -v git >/dev/null 2>&1 && [ -d .git ]; then
 fi
 
 echo "==> Construyendo imágenes..."
-docker compose -f "$COMPOSE_FILE" build
+docker compose "${COMPOSE_ARGS[@]}" build
 
 echo "==> Levantando servicios..."
-docker compose -f "$COMPOSE_FILE" up -d
+docker compose "${COMPOSE_ARGS[@]}" up -d
 
 echo "==> Estado:"
-docker compose -f "$COMPOSE_FILE" ps
+docker compose "${COMPOSE_ARGS[@]}" ps
 
 echo ""
 echo "Despliegue completado."
 echo "App: ${FRONTEND_URL:-http://localhost}"
 echo "API: ${FRONTEND_URL:-http://localhost}/api"
 echo ""
-echo "Logs: docker compose -f $COMPOSE_FILE logs -f"
-echo "Parar: docker compose -f $COMPOSE_FILE down"
+echo "Logs: docker compose ${COMPOSE_ARGS[*]} logs -f"
+echo "Parar: docker compose ${COMPOSE_ARGS[*]} down"

@@ -14,20 +14,20 @@ apt-get install -y certbot
 
 docker compose -f docker-compose.prod.yml stop web
 
-certbot certonly --standalone -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
+certbot certonly --standalone -d "$DOMAIN" -d "www.${DOMAIN}" --email "$EMAIL" --agree-tos --non-interactive
 
 mkdir -p deploy/nginx/ssl
 
 cat > deploy/nginx/ssl.conf <<EOF
 server {
     listen 80;
-    server_name ${DOMAIN};
+    server_name ${DOMAIN} www.${DOMAIN};
     return 301 https://\$host\$request_uri;
 }
 
 server {
     listen 443 ssl http2;
-    server_name ${DOMAIN};
+    server_name ${DOMAIN} www.${DOMAIN};
 
     ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
