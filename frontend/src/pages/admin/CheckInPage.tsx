@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { flushSync } from 'react-dom';
 import type { Html5Qrcode } from 'html5-qrcode';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScanLine, Hash, Camera, CameraOff, CheckCircle2, UserCheck } from 'lucide-react';
@@ -53,20 +52,20 @@ export default function CheckInPage() {
   }, []);
 
   const stopScanner = useCallback(async () => {
-    await stopQrScanner(scannerRef.current);
+    await stopQrScanner(scannerRef.current, scannerDivId);
     scannerRef.current = null;
     startingRef.current = false;
     setScanning(false);
   }, []);
 
   const startScanner = useCallback(async () => {
-    if (startingRef.current || scanning) return;
+    if (startingRef.current) return;
 
     startingRef.current = true;
     setCameraError(null);
 
     try {
-      await stopQrScanner(scannerRef.current);
+      await stopQrScanner(scannerRef.current, scannerDivId);
       scannerRef.current = null;
 
       const scanner = await startQrScanner(scannerDivId, (decoded) => {
@@ -81,17 +80,16 @@ export default function CheckInPage() {
       const message = describeCameraError(error);
       setCameraError(message);
       toast.error(message);
-      await stopQrScanner(scannerRef.current);
+      await stopQrScanner(scannerRef.current, scannerDivId);
       scannerRef.current = null;
       setScanning(false);
     } finally {
       startingRef.current = false;
     }
-  }, [registerAttendance, scanning, stopScanner]);
+  }, [registerAttendance, stopScanner]);
 
   const switchToQr = () => {
-    flushSync(() => setMode('qr'));
-    void startScanner();
+    setMode('qr');
   };
 
   useEffect(() => {
@@ -136,7 +134,10 @@ export default function CheckInPage() {
             {mode === 'qr' && (
               <Card>
                 <CardContent className="p-4 space-y-4">
-                  <div id={scannerDivId} className="rounded-xl overflow-hidden min-h-[280px] bg-muted" />
+                  <div
+                    id={scannerDivId}
+                    className="rounded-xl overflow-hidden min-h-[280px] bg-black [&_video]:!object-cover [&_video]:!w-full [&_video]:!h-[280px]"
+                  />
                   {!scanning && !cameraError && (
                     <p className="text-sm text-center text-muted-foreground">
                       Pulsa Iniciar cámara y acepta el permiso cuando el navegador lo pida.

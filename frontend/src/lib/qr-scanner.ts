@@ -1,17 +1,32 @@
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, type Html5QrcodeCameraScanConfig } from 'html5-qrcode';
 
 const BACK_CAMERA_RE = /back|rear|environment|trasera|posterior|wide/i;
-const SCAN_CONFIG = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
 const noop = () => {};
 
-async function pickCameraId(): Promise<string | undefined> {
+const SCAN_CONFIG: Html5QrcodeCameraScanConfig = {
+  fps: 10,
+  qrbox: (viewfinderWidth, viewfinderHeight) => {
+    const edge = Math.min(viewfinderWidth, viewfinderHeight);
+    const size = Math.max(Math.floor(edge * 0.7), 150);
+    return { width: size, height: size };
+  },
+};
+
+function clearContainer(elementId: string) {
+  const container = document.getElementById(elementId);
+  if (container) container.innerHTML = '';
+}
+
+async function safeStop(scanner: Html5Qrcode) {
   try {
-    const cameras = await Html5Qrcode.getCameras();
-    if (!cameras.length) return undefined;
-    const back = cameras.find(({ label }) => BACK_CAMERA_RE.test(label));
-    return back?.id ?? cameras.at(-1)?.id ?? cameras[0].id;
+    if (scanner.isScanning) await scanner.stop();
   } catch {
-    return undefined;
+    /* ignore */
+  }
+  try {
+    scanner.clear();
+  } catch {
+    /* ignore */
   }
 }
 
@@ -27,39 +42,50 @@ export async function startQrScanner(
   elementId: string,
   onScan: (decoded: string) => void,
 ): Promise<Html5Qrcode> {
-  const scanner = new Html5Qrcode(elementId);
+  clearContainer(elementId);
+
   let lastError: unknown;
 
-  const cameraAttempts: (string | MediaTrackConstraints)[] = [
+  try {
+    const cameras = await Html5Qrcode.getCameras();
+    if (cameras.length) {
+      const preferred =
+        cameras.find(({ label }) => BACK_CAMERA_RE.test(label)) ??
+        cameras.at(-1) ??
+        cameras[0];
+
+      const scanner = new Html5Qrcode(elementId);
+      try {
+        await tryStart(scanner, preferred.id, onScan);
+        return scanner;
+      } catch (error) {
+        lastError = error;
+        await safeStop(scanner);
+        clearContainer(elementId);
+      }
+    }
+  } catch (error) {
+    lastError = error;
+  }
+
+  const constraints: MediaTrackConstraints[] = [
     { facingMode: { ideal: 'environment' } },
     { facingMode: 'user' },
   ];
 
-  for (const camera of cameraAttempts) {
+  for (const camera of constraints) {
+    clearContainer(elementId);
+    const scanner = new Html5Qrcode(elementId);
     try {
       await tryStart(scanner, camera, onScan);
       return scanner;
     } catch (error) {
       lastError = error;
-      try {
-        await scanner.stop();
-      } catch {
-        scanner.clear();
-      }
+      await safeStop(scanner);
     }
   }
 
-  const cameraId = await pickCameraId();
-  if (cameraId) {
-    try {
-      await tryStart(scanner, cameraId, onScan);
-      return scanner;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  scanner.clear();
+  clearContainer(elementId);
   throw lastError ?? new Error('No se pudo acceder a la cámara');
 }
 
@@ -77,19 +103,17 @@ export function describeCameraError(error: unknown): string {
   if (name === 'NotFoundError' || message.includes('not found') || message.includes('no camera')) {
     return 'No se encontró ninguna cámara en este dispositivo.';
   }
-  if (name === 'NotReadableError' || message.includes('in use')) {
-    return 'La cámara está en uso por otra aplicación.';
+  if (name === 'NotReadableError' || message.includes('in use') || message.includes('could not start')) {
+    return 'La cámara está en uso. Cierra otras apps que la usen e intenta de nuevo.';
+  }
+  if (name === 'OverconstrainedError' || message.includes('overconstrained')) {
+    return 'No se pudo configurar la cámara. Intenta con otro navegador o dispositivo.';
   }
 
-  return 'No se pudo iniciar la cámara. Pulsa Iniciar cámara y acepta el permiso.';
+  return 'No se pudo iniciar la cámara. Pulsa Iniciar cámara e intenta de nuevo.';
 }
 
-export async function stopQrScanner(scanner: Html5Qrcode | null) {
-  if (!scanner) return;
-  try {
-    if (scanner.isScanning) await scanner.stop();
-    scanner.clear();
-  } catch {
-    /* ignore */
-  }
+export async function stopQrScanner(scanner: Html5Qrcode | null, elementId?: string) {
+  if (scanner) await safeStop(scanner);
+  if (elementId) clearContainer(elementId);
 }
