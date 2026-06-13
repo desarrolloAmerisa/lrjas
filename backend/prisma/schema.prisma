@@ -115,7 +115,9 @@ model Attendance {
   participantId String           @map("participant_id")
   participant   Participant      @relation(fields: [participantId], references: [id])
   method        AttendanceMethod
+  dateMexico    String           @map("date_mexico")
   createdAt     DateTime         @default(now()) @map("created_at")
 
+  @@unique([participantId, dateMexico])
   @@map("attendances")
 }
