@@ -137,6 +137,17 @@ export interface RegisterFormData {
   dynamicFields?: Record<string, boolean>;
 }
 
+export interface CredentialLookupOption {
+  code: string;
+  fullName: string;
+  stake: string;
+  ward: string;
+}
+
+export type CredentialLookupResult =
+  | { match: 'single'; participant: Participant }
+  | { match: 'multiple'; options: CredentialLookupOption[] };
+
 export interface MissingFieldInfo {
   key: string;
   label: string;

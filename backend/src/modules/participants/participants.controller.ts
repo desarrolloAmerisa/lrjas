@@ -14,6 +14,7 @@ import {
   CreateParticipantDto,
   UpdateParticipantDto,
   ParticipantQueryDto,
+  CredentialLookupDto,
 } from './dto/participant.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -41,6 +42,11 @@ export class ParticipantsController {
   @Get('code/:code')
   findByCode(@Param('code') code: string) {
     return this.participantsService.findByCode(code);
+  }
+
+  @Get('lookup/credential')
+  lookupForCredential(@Query() query: CredentialLookupDto) {
+    return this.participantsService.lookupForCredential(query.q);
   }
 
   @Get(':id')

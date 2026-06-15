@@ -259,19 +259,64 @@ export class ParticipantsService {
     };
   }
 
+  private participantInclude = {
+    stake: true,
+    ward: true,
+    fieldValues: { include: { field: true } },
+    attendances: { orderBy: { createdAt: 'desc' as const } },
+  };
+
   async findByCode(code: string) {
     const participant = await this.prisma.participant.findUnique({
       where: { code: code.padStart(3, '0') },
-      include: {
-        stake: true,
-        ward: true,
-        fieldValues: { include: { field: true } },
-        attendances: { orderBy: { createdAt: 'desc' } },
-      },
+      include: this.participantInclude,
     });
 
     if (!participant) throw new NotFoundException('Usuario no encontrado');
     return this.formatParticipant(participant);
+  }
+
+  async lookupForCredential(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) throw new BadRequestException('Ingresa un código o nombre');
+
+    if (/^\d+$/.test(trimmed)) {
+      return { match: 'single' as const, participant: await this.findByCode(trimmed) };
+    }
+
+    if (trimmed.length < 2) {
+      throw new BadRequestException('Escribe al menos 2 caracteres para buscar por nombre');
+    }
+
+    const matches = await this.prisma.participant.findMany({
+      where: {
+        OR: [
+          { code: { contains: trimmed } },
+          { firstName: { contains: trimmed, mode: 'insensitive' } },
+          { middleName: { contains: trimmed, mode: 'insensitive' } },
+          { lastName: { contains: trimmed, mode: 'insensitive' } },
+          { motherLastName: { contains: trimmed, mode: 'insensitive' } },
+        ],
+      },
+      take: 15,
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      include: this.participantInclude,
+    });
+
+    if (matches.length === 0) throw new NotFoundException('Usuario no encontrado');
+    if (matches.length === 1) {
+      return { match: 'single' as const, participant: this.formatParticipant(matches[0]) };
+    }
+
+    return {
+      match: 'multiple' as const,
+      options: matches.map((p) => ({
+        code: p.code,
+        fullName: [p.firstName, p.middleName, p.lastName, p.motherLastName].filter(Boolean).join(' '),
+        stake: p.stake.name,
+        ward: p.ward.name,
+      })),
+    };
   }
 
   async getCompletenessByCode(code: string) {

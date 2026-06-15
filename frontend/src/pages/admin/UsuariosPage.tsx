@@ -12,6 +12,7 @@ import {
   RefreshCw,
   FileSpreadsheet,
   Loader2,
+  QrCode,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -42,6 +43,7 @@ import {
   validateMemberStake,
 } from '@/lib/member-field';
 import { exportToExcel, buildDynamicFieldColumns } from '@/lib/export';
+import { downloadParticipantsQrZip } from '@/lib/qr-export';
 import { formatDate, formatTime, cn } from '@/lib/utils';
 import { ageFromBirthDateKey, maxBirthDateForAge, minBirthDateForAge } from '@/lib/mexico-time';
 import type { FieldDefinition, Participant, Stake } from '@/types';
@@ -54,6 +56,7 @@ export default function UsuariosPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportingQr, setExportingQr] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stakes, setStakes] = useState<Stake[]>([]);
   const [fields, setFields] = useState<FieldDefinition[]>([]);
@@ -241,6 +244,32 @@ export default function UsuariosPage() {
     }
   };
 
+  const exportQrZip = async () => {
+    setExportingQr(true);
+    try {
+      const res = await participantsApi.getAll({
+        search,
+        page: '1',
+        limit: '10000',
+        sortBy: 'code',
+        sortOrder: 'asc',
+      });
+      if (res.items.length === 0) {
+        toast.error('No hay usuarios para exportar');
+        return;
+      }
+      await downloadParticipantsQrZip(
+        res.items,
+        `qr-lrjas-${new Date().toISOString().slice(0, 10)}.zip`,
+      );
+      toast.success(`ZIP con ${res.items.length} QR descargado`);
+    } catch {
+      toast.error('Error al generar ZIP de QRs');
+    } finally {
+      setExportingQr(false);
+    }
+  };
+
   const editStake = stakes.find((s) => s.id === editForm.stakeId);
   const editAge = editForm.birthDate ? ageFromBirthDateKey(editForm.birthDate) : null;
   const { otherFields } = splitMemberField(fields);
@@ -282,9 +311,13 @@ export default function UsuariosPage() {
                   <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                   Actualizar
                 </Button>
-                <Button variant="outline" onClick={exportExcel} disabled={exporting} className="gap-2">
+                <Button variant="outline" onClick={exportExcel} disabled={exporting || exportingQr} className="gap-2">
                   {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                   Excel
+                </Button>
+                <Button variant="outline" onClick={exportQrZip} disabled={exporting || exportingQr} className="gap-2">
+                  {exportingQr ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                  QRs (ZIP)
                 </Button>
               </div>
             </div>

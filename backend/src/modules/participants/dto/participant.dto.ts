@@ -102,6 +102,11 @@ export class UpdateParticipantDto {
   dynamicFields?: Record<string, boolean>;
 }
 
+export class CredentialLookupDto {
+  @IsString()
+  q!: string;
+}
+
 export class ParticipantQueryDto {
   @IsOptional()
   @IsString()

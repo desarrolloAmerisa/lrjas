@@ -8,6 +8,7 @@ import type {
   Participant,
   RegisterFormData,
   ParticipantCompleteness,
+  CredentialLookupResult,
   Stake,
   Ward,
   User,
@@ -61,6 +62,8 @@ export const participantsApi = {
     api.get<PaginatedResponse<Participant>>('/participants', { params }).then((r) => r.data),
   getByCode: (code: string) =>
     api.get<Participant>(`/participants/code/${code}`).then((r) => r.data),
+  lookupCredential: (q: string) =>
+    api.get<CredentialLookupResult>('/participants/lookup/credential', { params: { q } }).then((r) => r.data),
   getCompleteness: (code: string) =>
     api.get<ParticipantCompleteness>(`/participants/code/${code}/completeness`).then((r) => r.data),
   getById: (id: string) => api.get<Participant>(`/participants/${id}`).then((r) => r.data),

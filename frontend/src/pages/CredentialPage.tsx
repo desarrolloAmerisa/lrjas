@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Loader2, Search, CalendarCheck, ScanLine, Hash } from 'lucide-react';
+import { Loader2, Search, CalendarCheck, ScanLine, Hash, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { PublicLayout } from '@/components/layout/PublicLayout';
 import { PageTransition, FadeIn } from '@/components/layout/PageTransition';
@@ -11,22 +11,53 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { participantsApi } from '@/services/api';
 import { formatDate, formatTime } from '@/lib/utils';
-import type { Participant } from '@/types';
+import type { CredentialLookupOption, Participant } from '@/types';
 
 export default function CredentialPage() {
   const location = useLocation();
-  const initialCode = (location.state as { code?: string })?.code || '';
-  const [searchCode, setSearchCode] = useState(initialCode);
+  const initialQuery = (location.state as { code?: string })?.code || '';
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [participant, setParticipant] = useState<Participant | null>(null);
+  const [matchOptions, setMatchOptions] = useState<CredentialLookupOption[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const loadParticipant = async (c: string) => {
-    if (!c || c.length < 1) return;
+  const loadParticipant = async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
     setLoading(true);
+    setMatchOptions([]);
     try {
-      setParticipant(await participantsApi.getByCode(c.padStart(3, '0')));
+      const result = await participantsApi.lookupCredential(trimmed);
+      if (result.match === 'single') {
+        setParticipant(result.participant);
+      } else {
+        setParticipant(null);
+        setMatchOptions(result.options);
+      }
+    } catch (err: unknown) {
+      const message =
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        typeof (err as { response?: { data?: { message?: string | string[] } } }).response?.data?.message === 'string'
+          ? (err as { response: { data: { message: string } } }).response.data.message
+          : 'Usuario no encontrado';
+      toast.error(message);
+      setParticipant(null);
+      setMatchOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectMatch = async (code: string) => {
+    setLoading(true);
+    setMatchOptions([]);
+    try {
+      setParticipant(await participantsApi.getByCode(code));
     } catch {
-      toast.error('Usuario no encontrado');
+      toast.error('No se pudo cargar la credencial');
       setParticipant(null);
     } finally {
       setLoading(false);
@@ -34,10 +65,13 @@ export default function CredentialPage() {
   };
 
   useEffect(() => {
-    if (initialCode) loadParticipant(initialCode);
-  }, [initialCode]);
+    if (initialQuery) loadParticipant(initialQuery);
+  }, [initialQuery]);
 
-  const handleSearch = () => loadParticipant(searchCode);
+  const handleSearch = () => {
+    setParticipant(null);
+    loadParticipant(searchQuery);
+  };
 
   return (
     <PublicLayout>
@@ -47,23 +81,52 @@ export default function CredentialPage() {
             <div>
               <h1 className="text-2xl font-bold mb-1">Mi credencial</h1>
               <p className="text-sm text-muted-foreground">
-                Consulta tu credencial, tómale captura o descárgala
+                Busca por código o por nombre para ver tu credencial, tomarle captura o descargarla
               </p>
             </div>
 
             <div className="flex gap-2">
               <Input
-                placeholder="Ingresa tu código (ej: 123)"
-                value={searchCode}
-                onChange={(e) => setSearchCode(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                placeholder="Código (ej: 123) o nombre"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="font-mono text-lg tracking-widest"
-                maxLength={3}
+                className="text-base uppercase"
+                autoComplete="off"
               />
-              <Button onClick={handleSearch} disabled={loading}>
+              <Button onClick={handleSearch} disabled={loading || !searchQuery.trim()}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               </Button>
             </div>
+
+            {matchOptions.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Varios resultados — elige tu nombre</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {matchOptions.map((option) => (
+                    <button
+                      key={option.code}
+                      type="button"
+                      onClick={() => selectMatch(option.code)}
+                      disabled={loading}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted/60 hover:bg-muted text-left transition-colors disabled:opacity-50"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-leaf/10">
+                        <User className="h-4 w-4 text-leaf-dark" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{option.fullName}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          Código {option.code} · {option.stake} · {option.ward}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
             {participant && (
               <div className="space-y-6">
