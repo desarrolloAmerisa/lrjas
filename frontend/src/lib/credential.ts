@@ -100,14 +100,20 @@ function drawCredentialCanvas(
   drawSpacedText(ctx, participant.code, CANVAS.width / 2, codeLabelY + 28, 40, 10);
 }
 
-export async function downloadCredentialPng(participant: Participant): Promise<void> {
-  const qrDataUrl = await generateQrDataUrl(participant.code);
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('No se pudo generar la imagen'));
+    }, 'image/png');
+  });
+}
 
-  const [logo, qr] = await Promise.all([
-    loadImage(BRAND.images.imagotipoGreen),
-    loadImage(qrDataUrl),
-  ]);
-
+function renderCredentialCanvas(
+  participant: Participant,
+  logo: HTMLImageElement,
+  qr: HTMLImageElement,
+): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS.width;
   canvas.height = CANVAS.height;
@@ -116,9 +122,27 @@ export async function downloadCredentialPng(participant: Participant): Promise<v
   if (!ctx) throw new Error('Canvas no disponible');
 
   drawCredentialCanvas(ctx, participant, logo, qr);
+  return canvas;
+}
 
+export async function generateCredentialBlob(
+  participant: Participant,
+  assets?: { logo?: HTMLImageElement; qr?: HTMLImageElement },
+): Promise<Blob> {
+  const qrDataUrl = assets?.qr ? null : await generateQrDataUrl(participant.code);
+  const [logo, qr] = await Promise.all([
+    assets?.logo ?? loadImage(BRAND.images.imagotipoGreen),
+    assets?.qr ?? loadImage(qrDataUrl!),
+  ]);
+
+  return canvasToBlob(renderCredentialCanvas(participant, logo, qr));
+}
+
+export async function downloadCredentialPng(participant: Participant): Promise<void> {
+  const blob = await generateCredentialBlob(participant);
   const link = document.createElement('a');
   link.download = `credencial-lrjas-${participant.code}.png`;
-  link.href = canvas.toDataURL('image/png');
+  link.href = URL.createObjectURL(blob);
   link.click();
+  URL.revokeObjectURL(link.href);
 }

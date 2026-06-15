@@ -260,11 +260,11 @@ export default function UsuariosPage() {
       }
       await downloadParticipantsQrZip(
         res.items,
-        `qr-lrjas-${new Date().toISOString().slice(0, 10)}.zip`,
+        `lrjas-qrs-credenciales-${new Date().toISOString().slice(0, 10)}.zip`,
       );
-      toast.success(`ZIP con ${res.items.length} QR descargado`);
+      toast.success(`ZIP con ${res.items.length} QRs y credenciales descargado`);
     } catch {
-      toast.error('Error al generar ZIP de QRs');
+      toast.error('Error al generar ZIP');
     } finally {
       setExportingQr(false);
     }
@@ -317,7 +317,7 @@ export default function UsuariosPage() {
                 </Button>
                 <Button variant="outline" onClick={exportQrZip} disabled={exporting || exportingQr} className="gap-2">
                   {exportingQr ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                  QRs (ZIP)
+                  QRs + credenciales
                 </Button>
               </div>
             </div>
