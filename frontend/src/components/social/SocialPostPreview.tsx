@@ -92,7 +92,7 @@ export function SocialPostPreview({ post, compact }: SocialPostPreviewProps) {
               ) : (
                 <FacebookIcon className="h-3.5 w-3.5" />
               )}
-              Abrir en {post.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
+              Abrir publicación
               <ExternalLink className="h-3 w-3" />
             </a>
           </Button>
